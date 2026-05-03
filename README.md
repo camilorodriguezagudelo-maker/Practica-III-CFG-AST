@@ -1,8 +1,8 @@
 # Práctica III - CFG y Árboles Sintácticos
 
 ## Integrantes
-- Tu nombre aquí
-- (Si tienes compañero, agrégalo)
+- Camilo Andres Rodriguez Agudelo
+- Juan Lucas Ramirez
 
 ## Lenguaje
 Python 3.13
