@@ -6,7 +6,7 @@
 
 - ## Video
 ## Video
-https://link-de-onedrive
+https://drive.google.com/file/d/1THSNwAChvZ9Duw7FPxoSYPfvianPhHME/view?usp=drive_link
 
 ## Lenguaje
 Python 3.13
