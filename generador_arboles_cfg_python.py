@@ -8,31 +8,63 @@ Instalación necesaria:
 pip install nltk matplotlib networkx
 
 Ejecución:
-python generador_arboles_cfg.py
+python generador_arboles_cfg_python.py
+
+IMPORTANTE:
+- Puedes escribir números reales como: 4, 25, 10.5
+- Puedes escribir letras o variables como: a, b, x, edad, total
+- Los operadores deben ir separados por espacios:
+  Correcto: 4 + x * 3
+  Incorrecto: 4+x*3
 """
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-import nltk
+import re
 import networkx as nx
 import matplotlib.pyplot as plt
 from nltk import CFG, ChartParser, Tree
 
 
 class GrammarModel:
-    """Clase encargada de cargar y validar la gramática."""
+    """Clase encargada de cargar la gramática y analizar la expresión."""
 
     def __init__(self, grammar_text):
         self.grammar_text = grammar_text
         self.grammar = CFG.fromstring(grammar_text)
         self.parser = ChartParser(self.grammar)
 
+    def tokenize_expression(self, expression):
+        """
+        Convierte la expresión ingresada por el usuario en tokens válidos para la gramática.
+        - Cualquier número se convierte en 'num'
+        - Cualquier variable o palabra se convierte en 'id'
+        - Los operadores se dejan igual: +, -, *, /, (, )
+        """
+        raw_tokens = expression.strip().split()
+        tokens = []
+
+        for token in raw_tokens:
+            if re.fullmatch(r"\d+(\.\d+)?", token):
+                tokens.append("num")
+            elif re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", token):
+                tokens.append("id")
+            elif token in ["+", "-", "*", "/", "(", ")"]:
+                tokens.append(token)
+            else:
+                raise ValueError(
+                    f"Token inválido: {token}\n"
+                    "Recuerda separar todo por espacios. Ejemplo: 4 + x * 3"
+                )
+
+        return tokens
+
     def parse_expression(self, expression):
-        tokens = expression.strip().split()
+        tokens = self.tokenize_expression(expression)
         trees = list(self.parser.parse(tokens))
         if not trees:
-            return None
-        return trees[0]
+            return None, tokens
+        return trees[0], tokens
 
 
 class DerivationGenerator:
@@ -77,7 +109,7 @@ class DerivationGenerator:
 
         children = list(node)
         if not left:
-            children = reversed(children)
+            children = list(reversed(children))
 
         for child in children:
             if isinstance(child, Tree):
@@ -133,10 +165,11 @@ class TreeVisualizer:
     def show_tree(self, tree, title):
         graph = nx.DiGraph()
         labels = {}
-        self._add_nodes(graph, labels, tree)
+        counter = [0]
+        root_id = self._add_nodes(graph, labels, tree, None, counter)
 
-        pos = self._hierarchy_pos(graph, list(graph.nodes)[0])
-        plt.figure(figsize=(10, 6))
+        pos = self._hierarchy_pos(graph, root_id)
+        plt.figure(figsize=(11, 7))
         nx.draw(
             graph,
             pos,
@@ -150,7 +183,7 @@ class TreeVisualizer:
         plt.title(title)
         plt.show()
 
-    def _add_nodes(self, graph, labels, tree, parent=None, counter=[0]):
+    def _add_nodes(self, graph, labels, tree, parent=None, counter=None):
         node_id = counter[0]
         counter[0] += 1
 
@@ -201,7 +234,7 @@ class CFGApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Generador de Derivación, Árbol de Derivación y AST")
-        self.root.geometry("1050x700")
+        self.root.geometry("1050x720")
 
         self.parse_tree = None
         self.ast_tree = None
@@ -224,21 +257,27 @@ class CFGApp:
         input_frame.pack(fill=tk.X, pady=5)
 
         ttk.Label(input_frame, text="Gramática CFG:").pack(anchor="w")
-        self.grammar_text = tk.Text(input_frame, height=7)
+        self.grammar_text = tk.Text(input_frame, height=8)
         self.grammar_text.pack(fill=tk.X)
 
         self.grammar_text.insert(
             tk.END,
             """S -> E
-E -> E '+' T | T
-T -> T '*' F | F
-F -> '(' E ')' | 'id'""",
+E -> E '+' T | E '-' T | T
+T -> T '*' F | T '/' F | F
+F -> '(' E ')' | 'num' | 'id'""",
         )
 
         ttk.Label(input_frame, text="Expresión objetivo, separada por espacios:").pack(anchor="w", pady=(10, 0))
         self.expression_entry = ttk.Entry(input_frame)
         self.expression_entry.pack(fill=tk.X)
-        self.expression_entry.insert(0, "id + id * id")
+        self.expression_entry.insert(0, "4 + x * 3")
+
+        help_label = ttk.Label(
+            input_frame,
+            text="Ejemplos válidos: 4 + 5 | x - y / 2 | total * 3 + edad | ( 4 + x ) / 2",
+        )
+        help_label.pack(anchor="w", pady=(5, 0))
 
         options_frame = ttk.Frame(input_frame)
         options_frame.pack(fill=tk.X, pady=10)
@@ -274,7 +313,7 @@ F -> '(' E ')' | 'id'""",
             expression = self.expression_entry.get().strip()
 
             grammar_model = GrammarModel(grammar_input)
-            self.parse_tree = grammar_model.parse_expression(expression)
+            self.parse_tree, tokens = grammar_model.parse_expression(expression)
 
             if self.parse_tree is None:
                 messagebox.showerror("Error", "La expresión no pertenece a la gramática ingresada.")
@@ -294,8 +333,15 @@ F -> '(' E ')' | 'id'""",
 
             self.output_text.delete("1.0", tk.END)
             self.output_text.insert(tk.END, derivation_title + "\n")
-            self.output_text.insert(tk.END, "=" * 50 + "\n\n")
+            self.output_text.insert(tk.END, "=" * 60 + "\n\n")
 
+            self.output_text.insert(tk.END, "Expresión ingresada:\n")
+            self.output_text.insert(tk.END, expression + "\n\n")
+
+            self.output_text.insert(tk.END, "Tokens usados internamente por la gramática:\n")
+            self.output_text.insert(tk.END, " ".join(tokens) + "\n\n")
+
+            self.output_text.insert(tk.END, "Pasos de derivación:\n")
             for i, step in enumerate(steps, start=1):
                 self.output_text.insert(tk.END, f"Paso {i}: {step}\n")
 
