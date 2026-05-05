@@ -4,6 +4,9 @@
 - Camilo Andres Rodriguez Agudelo
 - Juan Lucas Ramirez
 
+- ## Video
+https://link-de-onedrive
+
 ## Lenguaje
 Python 3.13
 
